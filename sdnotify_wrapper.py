@@ -31,8 +31,13 @@ def main():
         return run_child(read_pipe, args.timeout_ms, main_pid)
 
     os.close(read_pipe)
-    os.dup2(write_pipe, args.fd)
-    os.close(write_pipe)
+
+    if write_pipe == args.fd:
+        # by default pipes aren't inheritable
+        os.set_inheritable(write_pipe, True)
+    else:
+        os.dup2(write_pipe, args.fd)
+        os.close(write_pipe)
 
     if not args.keep:
         del os.environ["NOTIFY_SOCKET"]
@@ -59,7 +64,7 @@ class Arguments(typing.NamedTuple):
         init_args = {}
         for opt, arg in opts:
             if opt == "-d":
-                init_args["fd"] = arg
+                init_args["fd"] = int(arg)
             elif opt == "-f":
                 init_args["fork_once"] = True
             elif opt == "-t":
