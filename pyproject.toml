@@ -9,7 +9,7 @@ license = {file = "LICENSE.txt"}
 authors = [
     {name = "Simon Holesch", email = "simon@holesch.de"},
 ]
-keywords = ["systemd", "readiness", "sd_notify"]
+keywords = ["systemd", "daemon", "s6", "sd_notify"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
