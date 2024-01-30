@@ -2,8 +2,10 @@
 
 import getopt
 import os
+import select
 import struct
 import sys
+import time
 import typing
 
 
@@ -26,7 +28,7 @@ def main():
     pid = os.fork() if args.fork_once else double_fork()
     if is_forked_child(pid):
         os.close(write_pipe)
-        return run_child(read_pipe, args.timeout, main_pid)
+        return run_child(read_pipe, args.timeout_ms, main_pid)
 
     os.close(read_pipe)
     os.dup2(write_pipe, args.fd)
@@ -42,7 +44,7 @@ class Arguments(typing.NamedTuple):
     argv: typing.List[str]
     fd: int = 1  # default is stdout
     fork_once: bool = False
-    timeout: typing.Optional[int] = None
+    timeout_ms: typing.Optional[int] = None
     keep: bool = False
 
     @classmethod
@@ -61,7 +63,7 @@ class Arguments(typing.NamedTuple):
             elif opt == "-f":
                 init_args["fork_once"] = True
             elif opt == "-t":
-                init_args["timeout"] = arg
+                init_args["timeout_ms"] = int(arg)
             elif opt == "-k":
                 init_args["keep"] = True
             else:
@@ -107,11 +109,17 @@ def is_forked_child(pid):
     return pid == 0
 
 
-# pylint: disable=W0613
-# - unused-argument: timeout is not implemented, yet
-def run_child(read_pipe, timeout, main_pid):
+def run_child(read_pipe, timeout_ms, main_pid):
+    deadline = time.time() + (timeout_ms / 1000) if timeout_ms else None
     data = b""
+
     while b"\n" not in data:
+        if deadline:
+            timeout = max(deadline - time.time(), 0)
+            readable = select.select([read_pipe], [], [], timeout)[0]
+            if not readable:
+                return 99
+
         data = os.read(read_pipe, 4096)
         if not data:
             return 1
